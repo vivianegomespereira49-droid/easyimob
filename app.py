@@ -1,33 +1,10 @@
-import sys
-import asyncio
-
-# Corrige o bug de conexão perdida (WinError 10054) no Windows
-if sys.platform == 'win32':
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-    
 import streamlit as st
-from supabase import create_client, Client
 import pandas as pd
 from fpdf import FPDF
 import datetime
-import hashlib
-import json
-import requests
-# Requer: pip install streamlit-js-eval requests Pillow fpdf2 google-generativeai
-from streamlit_js_eval import get_geolocation
-
-# =========================================================================
-# --- CONFIGURAÇÕES DO EASYIMOB & STACK TECNOLÓGICO ---
-# =========================================================================
-
-# --- CONFIGURAÇÕES DE ACESSO AO BANCO DE DADOS (SUPABASE) ---
-# Substitua com suas chaves reais do Supabase (Project Settings -> API)
-URL = "ykditqjxulxnmkwkukzb"
-KEY = "ykditqjxulxnmkwkukzb"
-supabase: Client = create_client(URL, KEY)
+import random
 
 # --- ESTILIZAÇÃO E LOGO EASYIMOB (Identidade 360°) ---
-# Stack: Streamlit (Frontend/Interface gráfica Python)
 st.set_page_config(page_title="EasyImob - Ecossistema Imobiliário 360°", layout="wide", page_icon="🏢")
 
 # Cores da Identidade Visual (Degradê Turquesa/Verde Água)
@@ -36,7 +13,6 @@ secondary_color = "#00E676" # Verde Água
 text_color = "#1F2937" # Cinza Escuro
 bg_color = "#F9FAFB" # Cinza Muito Claro
 
-# Estilização CSS personalizada para interface moderna
 st.markdown(f"""
     <style>
     /* Estilização Geral */
@@ -73,60 +49,6 @@ st.markdown(f"""
     </style>
     """, unsafe_allow_html=True)
 
-# =========================================================================
-# --- MÓDULOS & FUNÇÕES DE ELITE (HELPER FUNCTIONS) ---
-# =========================================================================
-
-# --- MÓDULO DE AUTENTICAÇÃO SEGURA ---
-# Stack: Supabase Auth + SHA-256 criptografia
-def hash_pw(pw): return hashlib.sha256(str.encode(pw)).hexdigest()
-
-# --- MÓDULO DE RELATÓRIOS (PDF GENERATOR) ---
-# Stack: FPDF2 (Geração programática de arquivos PDF)
-def gerar_pdf_vistoria(dados):
-    """Gera PDF completo com carimbo GPS e Tempo"""
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", 'B', 20)
-    pdf.set_text_color(0, 194, 203) # Cor da marca
-    pdf.cell(0, 15, "EASYIMOB - RELATÓRIO 360°", 0, 1, 'C')
-    pdf.ln(10)
-    pdf.set_font("Arial", size=12)
-    pdf.set_text_color(31, 41, 55)
-    for k, v in dados.items():
-        pdf.set_font("Arial", 'B', 12)
-        pdf.cell(60, 10, f"{k}:", 1)
-        pdf.set_font("Arial", size=12)
-        pdf.cell(0, 10, f" {v}", 1, 1)
-    
-    # Adiciona aviso legal de validação GPS (Validação Jurídica)
-    pdf.ln(10)
-    pdf.set_font("Arial", 'I', 10)
-    pdf.multi_cell(0, 8, f"Relatório validado juridicamente via georreferenciamento em {dados['Data']}. GPS: {dados['GPS']}.")
-    
-    fn = f"vistoria_{datetime.datetime.now().strftime('%Y%m%d%H%M')}.pdf"
-    pdf.output(fn)
-    return fn
-
-# --- MÓDULO DE INTELIGÊNCIA ARTIFICIAL (IA VISTORIA) ---
-# Stack: Gemini Pro Vision (Google AI) integrado via API
-def simular_ia_vistoria(imagem, comodo):
-    """Simula análise de Visão Computacional"""
-    # Em produção, usaria API do Gemini ou GPT-4 Vision
-    reparos = ["Pintura descascando", "Rachadura superficial", "Mofo detectado", "Taco solto", "Vidro trincado"]
-    import random
-    return f"IA Diagnosticou em '{comodo}': {random.choice(reparos)}."
-
-# --- MÓDULO FINANCEIRO AUTÔNOMO (PIX AUTOMÁTICO) ---
-# Stack: API Asaas (Integração de pagamento via REST API com requests)
-def simular_pagamento_pix(valor, vencimento, usuario):
-    """Simula integração com Asaas para gerar link PIX"""
-    # Em produção, usaria requests.post(F"{ASAAS_URL}/payments", json=payload, headers=headers)
-    asaas_id = f"pay_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
-    # Link simulado para o painel do cliente
-    link = f"https://easyimob.co/p/{asaas_id}" 
-    return link, asaas_id
-
 # --- HEADER COM LOGO ---
 st.markdown(f"""
     <div class="logo-container">
@@ -134,162 +56,123 @@ st.markdown(f"""
             <span class="logo-icon">🏢</span>
             <span>EasyImob</span>
         </div>
-        <div class="logo-subtext">Ecossistema Imobiliário 360°</div>
+        <div class="logo-subtext">Ecossistema Imobiliário 360° [MODO DEMO]</div>
     </div>
     """, unsafe_allow_html=True)
 
-# =========================================================================
-# --- INTERFACE PRINCIPAL & LÓGICA DO APLICATIVO ---
-# =========================================================================
+# --- MENU LATERAL DE NAVEGAÇÃO LIVRE ---
+st.sidebar.markdown(f"""<div style='text-align: center; color: {primary_color}; font-size: 1.8rem; font-weight: bold;'>🏢 EasyImob Pro</div>""", unsafe_allow_html=True)
 
-# Inicializa estado da sessão de login
-if 'logged_in' not in st.session_state:
-    st.session_state.update({'logged_in': False, 'user': None, 'tipo': None})
+perfil = st.sidebar.radio("Alternar Visão do App:", ["Empresa (Administrador)", "Locatário (Cliente)"])
 
-# --- SISTEMA DE LOGIN E CADASTRO ---
-if not st.session_state['logged_in']:
-    tab_in, tab_reg = st.tabs(["Acessar EasyImob", "Novo Locatário"])
-    
-    with tab_in:
-        u = st.text_input("Usuário/E-mail")
-        p = st.text_input("Senha", type='password')
-        if st.button("Entrar no EasyImob"):
-            res = supabase.table('usuarios').select("*").eq('user_id', u).execute()
-            if res.data and res.data[0]['password'] == hash_pw(p):
-                st.session_state.update({'logged_in': True, 'user': u, 'tipo': res.data[0]['tipo']})
-                st.rerun()
-            else: st.error("Dados incorretos ou conta inexistente.")
-
-    with tab_reg:
-        nu = st.text_input("Crie seu Usuário/E-mail")
-        np = st.text_input("Crie sua Senha", type='password')
-        if st.button("Registrar Conta"):
-            supabase.table('usuarios').insert({"user_id": nu, "password": hash_pw(np), "tipo": "Locatário"}).execute()
-            st.success("Conta criada! Faça login na aba ao lado.")
-
+if perfil == "Empresa (Administrador)":
+    menu = ["📊 Dashboard 360°", "🔍 Vistoria IA", "🛠️ Reparos & Chat Enterprise", "💰 Financeiro Autônomo", "🔑 Chaves IoT"]
 else:
-    # --- BARRA LATERAL (SIDEBAR NAVIGATION) ---
-    st.sidebar.markdown(f"""<div style='text-align: center; color: {primary_color}; font-size: 2rem; font-weight: bold;'>🏢 EasyImob Pro</div>""", unsafe_allow_html=True)
-    st.sidebar.write(f"Conectado: **{st.session_state['user']}** ({st.session_state['tipo']})")
+    menu = ["🏠 Meu Smart Home", "🛠️ Central de Ajuda", "💵 Pagamentos & Recibos"]
     
-    # Menu dinâmico baseado no perfil do usuário
-    if st.session_state['tipo'] == 'Empresa':
-        menu = ["📊 Dashboard 360°", "🔍 Vistoria IA", "🛠️ Reparos & Chat Enterprise", "💰 Financeiro Autônomo", "🔑 Chaves IoT"]
-    else:
-        menu = ["🏠 Meu Smart Home", "🛠️ Central de Ajuda", "💵 Pagamentos & Recibos"]
+choice = st.sidebar.selectbox("Módulos do Sistema", menu)
+
+# =========================================================================
+# --- VISÃO EMPRESA (ADMIN) ---
+# =========================================================================
+if perfil == "Empresa (Administrador)":
+
+    if choice == "📊 Dashboard 360°":
+        st.title("Painel de Controle Integrado")
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Imóveis Ativos", "124", "+3 novos")
+        c2.metric("Vistorias/Mês", "45", "10% crescimento")
+        c3.metric("Reparos Abertos", "8", "-2 concluídos")
+        c4.metric("Receita PIX (Mês)", "R$ 42.500", "15% aumento")
         
-    choice = st.sidebar.selectbox("Navegação Integrada", menu)
+        st.subheader("Gráfico de Ocupação e Rendimentos")
+        chart_data = pd.DataFrame({'Mês': ['Jan', 'Fev', 'Mar', 'Abr', 'Mai'], 'Receita (R$)': [31000, 35000, 38000, 40000, 42500]})
+        st.line_chart(chart_data.set_index('Mês'))
 
-    # =========================================================================
-    # --- VISÃO EMPRESA (ADMIN) ---
-    # =========================================================================
-    if st.session_state['tipo'] == 'Empresa':
-
-        if choice == "📊 Dashboard 360°":
-            st.title("Painel de Controle Integrado")
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("Imóveis", "124", "+3")
-            c2.metric("Vistorias/Mês", "45", "10%")
-            c3.metric("Reparos Abertos", "8", "-2")
-            c4.metric("Receita PIX", "R$ 42k", "15%")
+    elif choice == "🔍 Vistoria IA":
+        st.title("Módulo de Vistoria 360°")
+        col_d, col_v = st.columns(2)
+        
+        with col_d:
+            st.subheader("Captura com Simulador de GPS e IA")
+            st.success("GPS Autenticado via Satélite: -23.55052, -46.633308 (São Paulo/SP)")
             
-            # Gráfico de Projeção de Ganhos
-            chart_data = pd.DataFrame([10, 15, 8, 22], columns=['Receita'])
-            st.line_chart(chart_data)
-
-        elif choice == "🔍 Vistoria IA":
-            st.title("Módulo de Vistoria 360°")
-            col_d, col_v = st.columns(2)
+            imovel_id = st.text_input("Código do Imóvel", value="AP-402")
+            comodo = st.selectbox("Cômodo Analisado", ["Sala de Estar", "Cozinha", "Quarto Principal", "Banheiro"])
+            foto = st.file_uploader("Envie uma foto do cômodo para simular a IA", type=['jpg','png','jpeg'])
             
-            with col_d:
-                st.subheader("Captura com GPS e IA")
-                # MÓDULO DE GPS (Obrigatória para validação jurídica)
-                loc = get_geolocation()
-                if loc:
-                    gps_coords = f"{loc['coords']['latitude']}, {loc['coords']['longitude']}"
-                    st.success(f"GPS Autenticado: {gps_coords}")
-                    
-                    # Identificação e Captura
-                    imovel_id = st.text_input("Cód. Imóvel", key="imov_vis")
-                    comodo = st.selectbox("Cômodo", ["Sala", "Cozinha", "Quarto 1", "Banheiro", "Sacada"])
-                    foto = st.camera_input("Tirar foto para análise")
-                    
-                    if foto:
-                        diagnostico = simular_ia_vistoria(foto, comodo)
-                        st.warning(diagnostico)
-                        
-                        if st.button("Finalizar Vistoria Validada"):
-                            supabase.table('vistorias').insert({
-                                "imovel_id": imovel_id,
-                                "vistoriador_id": st.session_state['user'],
-                                "coordenadas_gps": gps_coords,
-                                "comodo": comodo,
-                                "diagnostico_ia": diagnostico
-                            }).execute()
-                            st.success("Vistoria salva na nuvem EasyImob!")
-                else:
-                    st.warning("⚠️ Aguardando permissão do navegador para GPS (Obrigatório).")
-
-            with col_v:
-                st.subheader("Gerar Relatório PDF Certificado")
-                # Buscaria as últimas vistorias no Supabase
-                st.write("Lista de vistorias recentes...")
-
-        elif choice == "🛠️ Reparos & Chat Enterprise":
-            st.title("Central de Manutenção Enterprise")
-            st.write("Gestão de chamados de reparo com chat integrado.")
-            # Carregar chamados abertos no Supabase
-
-        elif choice == "💰 Financeiro Autônomo":
-            st.title("Gestão Financeira com PIX Automático")
-            # MÓDULO FINANCEIRO (Automação de cobrança via API Asaas)
-            st.subheader("Lançar Aluguel com PIX")
-            with st.form("gerar_cobranca"):
-                u_loc = st.text_input("E-mail do Locatário (EasyImob User)")
-                valor = st.number_input("Valor Aluguel", min_value=0.0)
-                venc = st.date_input("Vencimento")
-                
-                if st.form_submit_button("Gerar PIX"):
-                    # Simula a integração com Asaas
-                    link, asaas_id = simular_pagamento_pix(valor, venc, u_loc)
-                    
-                    supabase.table('financeiro').insert({
-                        "usuario": u_loc,
-                        "valor": valor,
-                        "vencimento": str(venc),
-                        "link_pagamento": link,
-                        "asaas_id": asaas_id,
-                        "status": "Aguardando Pagamento"
-                    }).execute()
-                    st.success(f"Cobrança gerada! Asaas ID: {asaas_id}")
-
-        elif choice == "🔑 Chaves IoT":
-            st.title("Gestão de Acessos IoT (Smart Key System)")
-            # MÓDULO IOT (Simula envio de comando para fechaduras inteligentes viarequests)
-            st.write("Gere acessos temporários para prestadores.")
-            prest = st.text_input("E-mail do Prestador")
-            if st.button("Gerar Token de Acesso"):
-                st.success(f"Token 'AC-9921-X' gerado e enviado para {prest}. Válido por 4h.")
+            if foto:
+                st.info("🤖 Inteligência Artificial EasyImob analisando imagem...")
+                reparos = ["Pintura descascando na parede lateral", "Rachadura superficial no teto", "Mofo detectado próximo à janela", "Vidro da janela trincado"]
+                st.warning(f"**Resultado da IA:** {random.choice(reparos)}")
+            
+            if st.button("Finalizar e Validar Vistoria Juridicamente"):
                 st.balloons()
+                st.success("Vistoria salva com sucesso no ecossistema 360°!")
 
-    # =========================================================================
-    # --- VISÃO LOCATÁRIO (CLIENTE) ---
-    # =========================================================================
-    else:
-        st.title("Portal do Locatário EasyImob")
-        if choice == "🏠 Meu Smart Home":
-            st.write("Acompanhe seus dados, contratos e controle IoT do imóvel.")
-            if st.button("Abrir Porta Principal (Via App)"):
-                 st.success("Porta aberta via Bluetooth/Wi-Fi")
+        with col_v:
+            st.subheader("Relatórios Emitidos recentemente")
+            with st.expander("Vistoria AP-402 - Realizada Hoje"):
+                st.write("**Cômodo:** Sala de Estar")
+                st.write("**Status:** Necessita reparo na pintura")
+                st.write("**Autenticação:** Carimbo de Tempo e Coordenadas GPS inclusos.")
+                st.button("Baixar PDF Demonstrativo")
 
-        elif choice == "🛠️ Central de Ajuda":
-            st.write("Solicitar reparos e acompanhar a resolução com chat de manutenção.")
-            # Abrir chamado de reparo no Supabase
+    elif choice == "🛠️ Reparos & Chat Enterprise":
+        st.title("Central de Manutenção Enterprise")
+        st.write("Histórico de chamados de manutenção ativos:")
+        
+        df_chamados = pd.DataFrame({
+            'ID': [101, 102],
+            'Imóvel': ['AP-402', 'CASA-12'],
+            'Problema': ['Vazamento na Cozinha', 'Disjuntor caindo'],
+            'Status': ['Em atendimento', 'Aberto']
+        })
+        st.table(df_chamados)
+        
+        st.subheader("Chat em Tempo Real com o Locatário")
+        st.markdown('<div class="message-bubble message-locatario"><b>Locatário (João):</b> Olá, o encanador já está vindo? O vazamento aumentou.</div>', unsafe_allow_html=True)
+        st.markdown('<div class="message-bubble message-empresa"><b>Imobiliária (Você):</b> Sim João, o técnico parceiro já está a caminho do AP-402. Estima-se 20 minutos.</div>', unsafe_allow_html=True)
+        st.text_input("Digite sua resposta...", placeholder="Enviar mensagem para o inquilino...")
 
-        elif choice == "💵 Pagamentos & Recibos":
-            st.write("Acompanhar pagamentos de aluguéis e taxas com PIX integrado.")
-            # Carregar pagamentos do Supabase
+    elif choice == "💰 Financeiro Autônomo":
+        st.title("Gestão Financeira com PIX Automático")
+        st.subheader("Lançar Novo Aluguel")
+        st.text_input("E-mail do Inquilino", value="joao.silva@email.com")
+        st.number_input("Valor do Aluguel (R$)", value=2500.0)
+        st.date_input("Data de Vencimento")
+        if st.button("Gerar Link de Pagamento e PIX"):
+            st.success("Cobrança criada via API de Pagamentos! Link gerado: https://easyimob.co/p/pay_demo")
 
-    if st.sidebar.button("Encerrar Sessão EasyImob Pro"):
-        st.session_state['logged_in'] = False
-        st.rerun()
+    elif choice == "🔑 Chaves IoT":
+        st.title("Gestão de Acessos IoT (Smart Key System)")
+        st.write("Controle chaves digitais para prestadores de serviço entrarem nos imóveis.")
+        st.text_input("E-mail do Prestador (ex: Eletricista)", value="pedro.reparos@email.com")
+        if st.button("Gerar Token Temporário"):
+            st.code("TOKEN DE ACESSO: KEY-8842-X", language="text")
+            st.success("Chave digital enviada por SMS e ativa por 4 horas na fechadura digital Intelbras/Yale.")
+
+# =========================================================================
+# --- VISÃO LOCATÁRIO (CLIENTE) ---
+# =========================================================================
+else:
+    st.title("Portal do Locatário EasyImob")
+    
+    if choice == "🏠 Meu Smart Home":
+        st.subheader("Seu Imóvel Ativo: Apartamento 402 - Bloco B")
+        st.write("Gerencie as funções integradas da sua casa.")
+        if st.button("🔓 Destrancar Porta Principal (Via Aplicativo)"):
+             st.success("Comando enviado! Porta destrancada via Bluetooth/Wi-Fi.")
+
+    elif choice == "🛠️ Central de Ajuda":
+        st.subheader("Solicitar Novo Reparo")
+        st.selectbox("Qual o problema?", ["Problema Elétrico", "Problema Hidráulico", "Chave/Fechadura Danificada", "Outros"])
+        st.text_area("Descreva detalhadamente o ocorrido...")
+        if st.button("Abrir Chamado Técnico"):
+            st.success("Chamado aberto! A imobiliária foi notificada no painel administrativo.")
+
+    elif choice == "💵 Pagamentos & Recibos":
+        st.subheader("Suas Cobranças")
+        col_p1, col_p2 = st.columns([3, 1])
+        col_p1.warning("Aluguel Competência Atual - Vencimento em 5 dias: **R$ 2.500,00**")
+        col_p2.button("Pagar com PIX Agora ✅")
