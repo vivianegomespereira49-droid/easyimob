@@ -22,8 +22,8 @@ from streamlit_js_eval import get_geolocation
 
 # --- CONFIGURAÇÕES DE ACESSO AO BANCO DE DADOS (SUPABASE) ---
 # Substitua com suas chaves reais do Supabase (Project Settings -> API)
-URL = "SUA_URL_SUPABASE"
-KEY = "SUA_CHAVE_SUPABASE"
+URL = "ykditqjxulxnmkwkukzb"
+KEY = "ykditqjxulxnmkwkukzb"
 supabase: Client = create_client(URL, KEY)
 
 # --- ESTILIZAÇÃO E LOGO EASYIMOB (Identidade 360°) ---
